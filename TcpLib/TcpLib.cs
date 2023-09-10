@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TcpLib
+namespace EasyTcpLibrary
 {
     public class TcpLib : IDisposable
     {
@@ -60,7 +60,7 @@ namespace TcpLib
         {
             _hostName = host;
             _port = ipPort;
-
+            _messageQueue.Clear();
             try
             {
                 _clientSocket = new TcpClient();
@@ -68,7 +68,6 @@ namespace TcpLib
                 _clientSocket.SendTimeout = SendTimeout;
                 _clientSocket.Connect(_hostName, _port);
                 _serverStream = _clientSocket.GetStream();
-                _messageQueue.Clear();
                 if (KeepAliveDelay > 0)
                     _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
             }
@@ -89,6 +88,7 @@ namespace TcpLib
                     if (IsConnected)
                     {
                         ReadTelnet();
+                        SendTelnet();
                         if (DateTime.Now >= _nextKeepAlive)
                         {
                             if (!SendKeepAlive())
@@ -126,16 +126,21 @@ namespace TcpLib
         }
 
         #region Data acquisition
-        private bool SendKeepAlive()
+
+        public bool Send(byte[] data)
         {
-            return SendData(new byte[] { });
+            if (!IsConnected)
+                return false;
+
+            _messageQueue.Enqueue(data);
+            return true;
         }
 
-        private bool SendData(byte[] outStream)
+        private bool SendData(byte[] data)
         {
             try
             {
-                _serverStream?.Write(outStream.ToArray(), 0, outStream.Count());
+                _serverStream?.Write(data.ToArray(), 0, data.Count());
 
                 if (KeepAliveDelay > 0)
                     _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
@@ -146,6 +151,19 @@ namespace TcpLib
             }
 
             return true;
+        }
+
+        private bool SendKeepAlive()
+        {
+            var result = false;
+            if (IsConnected)
+            {
+                //_serverStream.WriteTimeout = 1000;
+                result = SendData(new byte[] { 0 });
+                //_serverStream.WriteTimeout = SendTimeout;
+            }
+
+            return result;
         }
 
         private void ReadTelnet()
@@ -170,6 +188,12 @@ namespace TcpLib
                 }
             }
         }
+
+        private void SendTelnet()
+        {
+            if (_messageQueue.TryDequeue(out var message))
+                SendData(message);
+        }
         #endregion
 
         #region Events
@@ -180,6 +204,7 @@ namespace TcpLib
 
         private void OnDisconnectedEvent()
         {
+            Disconnect();
             DisconnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 

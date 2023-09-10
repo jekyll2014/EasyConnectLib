@@ -1,4 +1,4 @@
-﻿namespace TcpLib
+﻿namespace EasyTcpLibrary
 {
     public class TcpDataReceivedEventArgs
     {
