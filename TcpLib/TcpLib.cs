@@ -63,18 +63,21 @@ namespace EasyTcpLibrary
             _messageQueue.Clear();
             try
             {
-                _clientSocket = new TcpClient();
-                _clientSocket.ReceiveTimeout = ReceiveTimeout;
-                _clientSocket.SendTimeout = SendTimeout;
+                _clientSocket = new TcpClient
+                {
+                    ReceiveTimeout = ReceiveTimeout,
+                    SendTimeout = SendTimeout
+                };
+
                 _clientSocket.Connect(_hostName, _port);
                 _serverStream = _clientSocket.GetStream();
+
                 if (KeepAliveDelay > 0)
                     _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
             }
             catch (Exception ex)
             {
                 Disconnect();
-                _clientSocket = new TcpClient();
 
                 return false;
             }
@@ -89,15 +92,13 @@ namespace EasyTcpLibrary
                     {
                         ReadTelnet();
                         SendTelnet();
-                        if (DateTime.Now >= _nextKeepAlive)
-                        {
-                            if (!SendKeepAlive())
-                                OnDisconnectedEvent();
-                        }
+
+                        if (DateTime.Now >= _nextKeepAlive && !SendKeepAlive())
+                            Disconnect();
                     }
                     else
                     {
-                        OnDisconnectedEvent();
+                        Disconnect();
                     }
                 }
             });
@@ -108,6 +109,7 @@ namespace EasyTcpLibrary
         public bool Disconnect()
         {
             _cts.Cancel();
+            var result = true;
             try
             {
                 _serverStream?.Close();
@@ -116,13 +118,15 @@ namespace EasyTcpLibrary
             }
             catch (Exception ex)
             {
-                return false;
+                result = false;
             }
 
             _hostName = null;
             _port = -1;
 
-            return true;
+            OnDisconnectedEvent();
+
+            return result;
         }
 
         #region Data acquisition
@@ -141,51 +145,46 @@ namespace EasyTcpLibrary
             try
             {
                 _serverStream?.Write(data.ToArray(), 0, data.Count());
-
-                if (KeepAliveDelay > 0)
-                    _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
             }
             catch
             {
                 return false;
             }
 
+            if (KeepAliveDelay > 0)
+                _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
+
             return true;
         }
 
         private bool SendKeepAlive()
         {
-            var result = false;
-            if (IsConnected)
-            {
-                //_serverStream.WriteTimeout = 1000;
-                result = SendData(new byte[] { 0 });
-                //_serverStream.WriteTimeout = SendTimeout;
-            }
-
-            return result;
+            return SendData(new byte[] { 0 });
         }
 
         private void ReadTelnet()
         {
-            if (IsConnected && (_serverStream?.DataAvailable ?? false))
+            if (IsConnected)
             {
                 try
                 {
-                    var data = new List<byte>();
-                    while (_clientSocket?.Available > 0)
+                    if ((_serverStream?.DataAvailable ?? false) && _clientSocket?.Available > 0)
                     {
+                        var data = new List<byte>();
                         var buffer = new byte[_clientSocket.Available];
-                        _serverStream.ReadAsync(buffer, 0, buffer.Length).Wait();
+                        _serverStream.Read(buffer, 0, buffer.Length);
                         data.AddRange(buffer);
+                        OnDataReceivedEvent(data.ToArray());
                     }
-
-                    OnDataReceivedEvent(data.ToArray());
                 }
                 catch (Exception ex)
                 {
                     Debug.Write(ex.Message);
                 }
+            }
+            else
+            {
+                Disconnect();
             }
         }
 
@@ -204,7 +203,6 @@ namespace EasyTcpLibrary
 
         private void OnDisconnectedEvent()
         {
-            Disconnect();
             DisconnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
