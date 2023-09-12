@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
@@ -41,7 +40,7 @@ namespace EasyTcpLibrary
         private string? _hostName;
         private int _port;
         private DateTime _nextKeepAlive = DateTime.Now;
-        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
 
@@ -84,6 +83,7 @@ namespace EasyTcpLibrary
 
             OnConnectedEvent();
 
+            _cts = new CancellationTokenSource();
             Task.Run(() =>
             {
                 while (!_cts.IsCancellationRequested)
@@ -93,7 +93,7 @@ namespace EasyTcpLibrary
                         ReadTelnet();
                         SendTelnet();
 
-                        if (DateTime.Now >= _nextKeepAlive && !SendKeepAlive())
+                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive())
                             Disconnect();
                     }
                     else
@@ -101,7 +101,7 @@ namespace EasyTcpLibrary
                         Disconnect();
                     }
                 }
-            });
+            }, _cts.Token);
 
             return true;
         }
@@ -170,11 +170,9 @@ namespace EasyTcpLibrary
                 {
                     if ((_serverStream?.DataAvailable ?? false) && _clientSocket?.Available > 0)
                     {
-                        var data = new List<byte>();
                         var buffer = new byte[_clientSocket.Available];
                         _serverStream.Read(buffer, 0, buffer.Length);
-                        data.AddRange(buffer);
-                        OnDataReceivedEvent(data.ToArray());
+                        OnDataReceivedEvent(buffer);
                     }
                 }
                 catch (Exception ex)
