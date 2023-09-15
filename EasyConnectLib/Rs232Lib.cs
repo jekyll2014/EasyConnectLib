@@ -160,9 +160,9 @@ namespace EasyConnectLib
         private readonly object _lockReceive = new object();
         private void OnDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
         {
-            lock (_lockReceive)
+            if (_serialPort?.IsOpen ?? false)
             {
-                if (_serialPort?.IsOpen ?? false)
+                lock (_lockReceive)
                 {
                     var l = _serialPort.BytesToRead;
                     if (l > 0)
@@ -186,10 +186,10 @@ namespace EasyConnectLib
                             receiveBuffer.AddRange(data[0..(n - 1)]);
                     }
                 }
-                else
-                {
-                    Disconnect();
-                }
+            }
+            else
+            {
+                Disconnect();
             }
         }
 
