@@ -17,13 +17,7 @@ namespace EasyConnectLib
         public int SendTimeout = 1000;
         public int KeepAliveDelay = 1000;
 
-        public bool IsConnected
-        {
-            get
-            {
-                return _clientSocket?.Client?.Connected ?? false;
-            }
-        }
+        public bool IsConnected => _clientSocket?.Client?.Connected ?? false;
 
         int IConnectionPort.ReceiveTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         int IConnectionPort.SendTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
@@ -168,10 +162,10 @@ namespace EasyConnectLib
             return SendData(new byte[] { 0 });
         }
 
-        private object lockReceive = new object();
+        private readonly object _lockReceive = new object();
         private void ReadTelnet()
         {
-            lock (lockReceive)
+            lock (_lockReceive)
             {
                 if (IsConnected)
                 {

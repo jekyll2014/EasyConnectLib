@@ -53,14 +53,17 @@ namespace EasyConnectLib
             receiveBuffer.Clear();
             try
             {
-                _serialPort = new SerialPort();
-                _serialPort.BaudRate = speed;
-                _serialPort.DataBits = 8;
-                _serialPort.Parity = Parity.None;
-                _serialPort.StopBits = StopBits.One;
-                _serialPort.Handshake = Handshake.None;
-                _serialPort.ReadTimeout = ReceiveTimeout;
-                _serialPort.WriteTimeout = SendTimeout;
+                _serialPort = new SerialPort
+                {
+                    BaudRate = speed,
+                    DataBits = 8,
+                    Parity = Parity.None,
+                    StopBits = StopBits.One,
+                    Handshake = Handshake.None,
+                    ReadTimeout = ReceiveTimeout,
+                    WriteTimeout = SendTimeout
+                };
+
                 _serialPort.DataReceived += OnDataReceivedEventHandler;
                 _serialPort.ErrorReceived += OnErrorEventHandler;
                 _serialPort.PinChanged += OnPinChangedEventHandler;
@@ -154,10 +157,10 @@ namespace EasyConnectLib
         #endregion
 
         #region EventHandlers
-        private object lockReceive = new object();
+        private readonly object _lockReceive = new object();
         private void OnDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
         {
-            lock (lockReceive)
+            lock (_lockReceive)
             {
                 if (_serialPort?.IsOpen ?? false)
                 {
