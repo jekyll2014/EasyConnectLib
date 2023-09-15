@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
@@ -32,8 +31,11 @@ namespace EasyTcpLibrary
         public delegate void DisconnectedEventHandler(object sender, EventArgs e);
         public event DisconnectedEventHandler? DisconnectedEvent;
 
-        public delegate void DataReceivedEventHandler(object sender, TcpDataReceivedEventArgs e);
+        public delegate void DataReceivedEventHandler(object sender, BinaryDataReceivedEventArgs e);
         public event DataReceivedEventHandler? DataReceivedEvent;
+
+        public delegate void ErrorEventHandler(object sender, ErrorReceivedEventArgs e);
+        public event ErrorEventHandler? ErrorEvent;
 
         private TcpClient? _clientSocket;
         private NetworkStream? _serverStream;
@@ -77,6 +79,7 @@ namespace EasyTcpLibrary
             catch (Exception ex)
             {
                 Disconnect();
+                OnErrorEvent(ex.Message);
 
                 return false;
             }
@@ -118,6 +121,8 @@ namespace EasyTcpLibrary
             }
             catch (Exception ex)
             {
+                OnErrorEvent(ex.Message);
+
                 result = false;
             }
 
@@ -146,8 +151,10 @@ namespace EasyTcpLibrary
             {
                 _serverStream?.Write(data.ToArray(), 0, data.Count());
             }
-            catch
+            catch (Exception ex)
             {
+                OnErrorEvent(ex.Message);
+
                 return false;
             }
 
@@ -168,16 +175,17 @@ namespace EasyTcpLibrary
             {
                 try
                 {
-                    if ((_serverStream?.DataAvailable ?? false) && _clientSocket?.Available > 0)
+                    if ((_serverStream?.DataAvailable ?? false))
                     {
-                        var buffer = new byte[_clientSocket.Available];
-                        _serverStream.Read(buffer, 0, buffer.Length);
-                        OnDataReceivedEvent(buffer);
+                        var l = _clientSocket?.Available ?? 0;
+                        var buffer = new byte[l];
+                        var n = _serverStream.Read(buffer, 0, l);
+                        OnDataReceivedEvent(buffer[0..(n - 1)]);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.Write(ex.Message);
+                    OnErrorEvent(ex.Message);
                 }
             }
             else
@@ -206,7 +214,12 @@ namespace EasyTcpLibrary
 
         private void OnDataReceivedEvent(byte[] data)
         {
-            DataReceivedEvent?.Invoke(this, new TcpDataReceivedEventArgs(data));
+            DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data));
+        }
+
+        private void OnErrorEvent(string message)
+        {
+            ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
         }
         #endregion
 

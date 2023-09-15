@@ -1,10 +1,10 @@
 ﻿namespace EasyTcpLibrary
 {
-    public class TcpDataReceivedEventArgs
+    public class BinaryDataReceivedEventArgs
     {
         public byte[] Data;
 
-        public TcpDataReceivedEventArgs(byte[] data)
+        public BinaryDataReceivedEventArgs(byte[] data)
         {
             Data = data;
         }
