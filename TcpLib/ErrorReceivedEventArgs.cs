@@ -1,8 +1,8 @@
-﻿namespace EasyTcpLibrary
+﻿namespace EasyConnectLib
 {
     public class ErrorReceivedEventArgs
     {
-        public string Message;
+        public readonly string Message;
 
         public ErrorReceivedEventArgs(string message)
         {

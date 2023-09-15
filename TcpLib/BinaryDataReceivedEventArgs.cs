@@ -1,8 +1,8 @@
-﻿namespace EasyTcpLibrary
+﻿namespace EasyConnectLib
 {
     public class BinaryDataReceivedEventArgs
     {
-        public byte[] Data;
+        public readonly byte[] Data;
 
         public BinaryDataReceivedEventArgs(byte[] data)
         {

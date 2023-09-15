@@ -1,17 +1,17 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace EasyTcpLibrary
+namespace EasyConnectLib
 {
-    public class TcpLib : IDisposable
+    public class TcpLib : IDisposable, IConnectionPort
     {
-
-        public string? Host { get => _hostName; }
-        public int? Port { get => _port; }
+        public string? Host => _hostName;
+        public int? Port => _port;
 
         public int ReceiveTimeout = 1000;
         public int SendTimeout = 1000;
@@ -25,17 +25,20 @@ namespace EasyTcpLibrary
             }
         }
 
+        int IConnectionPort.ReceiveTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        int IConnectionPort.SendTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
         public delegate void ConnectedEventHandler(object sender, EventArgs e);
-        public event ConnectedEventHandler? ConnectedEvent;
+        public event IConnectionPort.ConnectedEventHandler? ConnectedEvent;
 
         public delegate void DisconnectedEventHandler(object sender, EventArgs e);
-        public event DisconnectedEventHandler? DisconnectedEvent;
+        public event IConnectionPort.DisconnectedEventHandler? DisconnectedEvent;
 
         public delegate void DataReceivedEventHandler(object sender, BinaryDataReceivedEventArgs e);
-        public event DataReceivedEventHandler? DataReceivedEvent;
+        public event IConnectionPort.DataReceivedEventHandler? DataReceivedEvent;
 
         public delegate void ErrorEventHandler(object sender, ErrorReceivedEventArgs e);
-        public event ErrorEventHandler? ErrorEvent;
+        public event IConnectionPort.ErrorEventHandler? ErrorEvent;
 
         private TcpClient? _clientSocket;
         private NetworkStream? _serverStream;
@@ -45,12 +48,11 @@ namespace EasyTcpLibrary
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
+        private readonly List<byte> receiveBuffer = new List<byte>();
 
         private bool _disposedValue;
 
-        public TcpLib()
-        {
-        }
+        public TcpLib() { }
 
         public TcpLib(string host, int port)
         {
@@ -94,7 +96,7 @@ namespace EasyTcpLibrary
                     if (IsConnected)
                     {
                         ReadTelnet();
-                        SendTelnet();
+                        SendDataFromQueue();
 
                         if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive())
                             Disconnect();
@@ -125,9 +127,6 @@ namespace EasyTcpLibrary
 
                 result = false;
             }
-
-            _hostName = null;
-            _port = -1;
 
             OnDisconnectedEvent();
 
@@ -169,35 +168,57 @@ namespace EasyTcpLibrary
             return SendData(new byte[] { 0 });
         }
 
+        private object lockReceive = new object();
         private void ReadTelnet()
         {
-            if (IsConnected)
+            lock (lockReceive)
             {
-                try
+                if (IsConnected)
                 {
-                    if ((_serverStream?.DataAvailable ?? false))
+                    if (_serverStream?.DataAvailable ?? false)
                     {
                         var l = _clientSocket?.Available ?? 0;
-                        var buffer = new byte[l];
-                        var n = _serverStream.Read(buffer, 0, l);
-                        OnDataReceivedEvent(buffer[0..(n - 1)]);
+                        if (l > 0)
+                        {
+                            var data = new byte[l];
+                            var n = 0;
+                            try
+                            {
+                                n = _serverStream.Read(data, 0, l);
+                            }
+                            catch (Exception ex)
+                            {
+                                OnErrorEvent(ex.Message);
+
+                                return;
+                            }
+
+                            if (DataReceivedEvent != null)
+                                OnDataReceivedEvent(data[0..(n - 1)]);
+                            else
+                                receiveBuffer.AddRange(data[0..(n - 1)]);
+                        }
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    OnErrorEvent(ex.Message);
+                    Disconnect();
                 }
-            }
-            else
-            {
-                Disconnect();
             }
         }
 
-        private void SendTelnet()
+        private void SendDataFromQueue()
         {
             if (_messageQueue.TryDequeue(out var message))
                 SendData(message);
+        }
+
+        public byte[] Read()
+        {
+            var result = receiveBuffer.ToArray();
+            receiveBuffer.Clear();
+
+            return result;
         }
         #endregion
 
