@@ -88,7 +88,7 @@ namespace EasyConnectLib
                     }
                     else
                     {
-                        OnDisconnectedEvent();
+                        Disconnect();
                     }
                 }
             });
@@ -110,6 +110,8 @@ namespace EasyConnectLib
 
                 return false;
             }
+
+            OnDisconnectedEvent();
 
             return true;
         }
@@ -207,23 +209,23 @@ namespace EasyConnectLib
         #region Events
         private void OnConnectedEvent()
         {
-            ConnectedEvent?.Invoke(this, EventArgs.Empty);
+            Task.Run(() => ConnectedEvent?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnDisconnectedEvent()
         {
             Disconnect();
-            DisconnectedEvent?.Invoke(this, EventArgs.Empty);
+            Task.Run(() => DisconnectedEvent?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnDataReceivedEvent(byte[] data)
         {
-            DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data));
+            Task.Run(() => DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data)));
         }
 
         private void OnErrorEvent(string message)
         {
-            ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
+            Task.Run(() => ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message)));
         }
 
         private void OnPinChangedEvent(SerialPinChange pin)
