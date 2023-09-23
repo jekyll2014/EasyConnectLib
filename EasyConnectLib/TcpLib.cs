@@ -178,39 +178,39 @@ namespace EasyConnectLib
         private void ReadTelnet()
         {
             //lock (_lockReceive)
+            //{
+            if (IsConnected)
             {
-                if (IsConnected)
+                if (_serverStream?.DataAvailable ?? false)
                 {
-                    if (_serverStream?.DataAvailable ?? false)
+                    var l = _clientSocket?.Available ?? 0;
+                    if (l > 0)
                     {
-                        var l = _clientSocket?.Available ?? 0;
-                        if (l > 0)
+                        var data = new byte[l];
+                        var n = 0;
+                        try
                         {
-                            var data = new byte[l];
-                            var n = 0;
-                            try
-                            {
-                                n = _serverStream.Read(data, 0, l);
-                            }
-                            catch (Exception ex)
-                            {
-                                OnErrorEvent(ex.Message);
-
-                                return;
-                            }
-
-                            if (DataReceivedEvent != null)
-                                OnDataReceivedEvent(data[0..n]);
-                            else
-                                receiveBuffer.AddRange(data[0..n]);
+                            n = _serverStream.Read(data, 0, l);
                         }
+                        catch (Exception ex)
+                        {
+                            OnErrorEvent(ex.Message);
+
+                            return;
+                        }
+
+                        if (DataReceivedEvent != null)
+                            OnDataReceivedEvent(data[0..n]);
+                        else
+                            receiveBuffer.AddRange(data[0..n]);
                     }
                 }
-                else
-                {
-                    Disconnect();
-                }
             }
+            else
+            {
+                Disconnect();
+            }
+            //}
         }
 
         private void SendDataFromQueue()
