@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 
 namespace EasyConnectLib
 {
-    public class Rs232Lib : IDisposable, IConnectionPort
+    public class Rs232Lib : IConnectionPort
     {
-        public string? Port => _portName;
-        public int? Speed => _speed;
+        public string Port = "";
+        public int Speed = 115200;
 
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
@@ -30,8 +30,6 @@ namespace EasyConnectLib
         public event IConnectionPort.ErrorEventHandler? ErrorEvent;
 
         private SerialPort? _serialPort;
-        private string? _portName;
-        private int _speed;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
@@ -42,20 +40,28 @@ namespace EasyConnectLib
 
         public Rs232Lib(string port, int speed)
         {
-            Connect(port, speed);
+            Port = port;
+            Speed = speed;
         }
 
         public bool Connect(string port, int speed)
         {
-            _portName = port;
-            _speed = speed;
+            Port = port;
+            Speed = speed;
             _messageQueue.Clear();
             receiveBuffer.Clear();
+
+            return Connect();
+        }
+
+        public bool Connect()
+        {
             try
             {
                 _serialPort = new SerialPort
                 {
-                    BaudRate = speed,
+                    PortName = Port,
+                    BaudRate = Speed,
                     DataBits = 8,
                     Parity = Parity.None,
                     StopBits = StopBits.One,
@@ -63,6 +69,7 @@ namespace EasyConnectLib
                     ReadTimeout = ReceiveTimeout,
                     WriteTimeout = SendTimeout
                 };
+                _serialPort.Open();
 
                 _serialPort.DataReceived += OnDataReceivedEventHandler;
                 _serialPort.ErrorReceived += OnErrorEventHandler;
@@ -88,12 +95,19 @@ namespace EasyConnectLib
                     }
                     else
                     {
-                        Disconnect();
+					Disconnect();
+                        OnDisconnectedEvent();
                     }
                 }
             });
 
             return true;
+        }
+
+        public bool Reconnect()
+        {
+            Disconnect();
+            return Connect();
         }
 
         public bool Disconnect()

@@ -2,7 +2,7 @@
 
 namespace EasyConnectLib
 {
-    public interface IConnectionPort
+    public interface IConnectionPort : IDisposable
     {
         public int ReceiveTimeout { get; set; }
         public int SendTimeout { get; set; }
@@ -20,6 +20,10 @@ namespace EasyConnectLib
 
         public delegate void ErrorEventHandler(object sender, ErrorReceivedEventArgs e);
         public event ErrorEventHandler? ErrorEvent;
+
+        public bool Connect();
+
+        public bool Reconnect();
 
         public bool Disconnect();
 

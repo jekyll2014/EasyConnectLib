@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 
 namespace EasyConnectLib
 {
-    public class TcpLib : IDisposable, IConnectionPort
+    public class TcpLib : IConnectionPort
     {
-        public string? Host => _hostName;
-        public int? Port => _port;
+        public string Host = "127.0.0.1";
+        public int Port = 23;
 
         public int ReceiveTimeout = 1000;
         public int SendTimeout = 1000;
@@ -36,8 +36,6 @@ namespace EasyConnectLib
 
         private TcpClient? _clientSocket;
         private NetworkStream? _serverStream;
-        private string? _hostName;
-        private int _port;
         private DateTime _nextKeepAlive = DateTime.Now;
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
@@ -50,13 +48,21 @@ namespace EasyConnectLib
 
         public TcpLib(string host, int port)
         {
-            Connect(host, port);
+            Host = host;
+            Port = port;
         }
 
-        public bool Connect(string host, int ipPort)
+        public bool Connect(string host, int port)
         {
-            _hostName = host;
-            _port = ipPort;
+            Host = host;
+            Port = port;
+            _messageQueue.Clear();
+
+            return Connect();
+        }
+
+        public bool Connect()
+        {
             _messageQueue.Clear();
             try
             {
@@ -66,7 +72,7 @@ namespace EasyConnectLib
                     SendTimeout = SendTimeout
                 };
 
-                _clientSocket.Connect(_hostName, _port);
+                _clientSocket.Connect(Host, Port);
                 _serverStream = _clientSocket.GetStream();
 
                 if (KeepAliveDelay > 0)
@@ -103,6 +109,12 @@ namespace EasyConnectLib
             }, _cts.Token);
 
             return true;
+        }
+
+        public bool Reconnect()
+        {
+            Disconnect();
+            return Connect();
         }
 
         public bool Disconnect()
