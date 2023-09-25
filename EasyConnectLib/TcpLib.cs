@@ -13,14 +13,11 @@ namespace EasyConnectLib
         public string Host = "127.0.0.1";
         public int Port = 23;
 
-        public int ReceiveTimeout = 1000;
-        public int SendTimeout = 1000;
+        public int ReceiveTimeout { get; set; } = 1000;
+        public int SendTimeout { get; set; } = 1000;
         public int KeepAliveDelay = 1000;
 
         public bool IsConnected => _clientSocket?.Client?.Connected ?? false;
-
-        int IConnectionPort.ReceiveTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        int IConnectionPort.SendTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public delegate void ConnectedEventHandler(object sender, EventArgs e);
         public event IConnectionPort.ConnectedEventHandler? ConnectedEvent;
