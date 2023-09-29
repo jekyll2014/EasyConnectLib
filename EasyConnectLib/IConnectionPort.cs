@@ -23,7 +23,7 @@ namespace EasyConnectLib
 
         public bool Connect();
 
-        public bool Reconnect();
+        //public bool Reconnect();
 
         public bool Disconnect();
 

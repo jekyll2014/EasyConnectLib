@@ -95,7 +95,7 @@ namespace EasyConnectLib
                     }
                     else
                     {
-					Disconnect();
+                        Disconnect();
                         OnDisconnectedEvent();
                     }
                 }
@@ -104,11 +104,11 @@ namespace EasyConnectLib
             return true;
         }
 
-        public bool Reconnect()
+        /*public bool Reconnect()
         {
             Disconnect();
             return Connect();
-        }
+        }*/
 
         public bool Disconnect()
         {

@@ -95,7 +95,7 @@ namespace EasyConnectLib
                         SendDataFromQueue();
                         ReadTelnet();
 
-                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive())
+                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive().Result)
                             Disconnect();
                     }
                     else
@@ -108,11 +108,11 @@ namespace EasyConnectLib
             return true;
         }
 
-        public bool Reconnect()
+        /*public bool Reconnect()
         {
             Disconnect();
             return Connect();
-        }
+        }*/
 
         public bool Disconnect()
         {
@@ -147,11 +147,18 @@ namespace EasyConnectLib
             return true;
         }
 
-        private bool SendData(byte[] data)
+        private async Task<bool> SendData(byte[] data)
         {
             try
             {
-                _serverStream?.Write(data.ToArray(), 0, data.Count());
+                if (_serverStream != null && IsConnected)
+                {
+                    await _serverStream.WriteAsync(data.ToArray(), 0, data.Count());
+                }
+                else
+                {
+                    Disconnect();
+                }
             }
             catch (Exception ex)
             {
@@ -166,16 +173,13 @@ namespace EasyConnectLib
             return true;
         }
 
-        private bool SendKeepAlive()
+        private async Task<bool> SendKeepAlive()
         {
-            return SendData(new byte[] { 0 });
+            return await SendData(new byte[] { 0 });
         }
 
-        private readonly object _lockReceive = new object();
         private void ReadTelnet()
         {
-            //lock (_lockReceive)
-            //{
             if (IsConnected)
             {
                 if (_serverStream?.DataAvailable ?? false)
@@ -184,7 +188,7 @@ namespace EasyConnectLib
                     if (l > 0)
                     {
                         var data = new byte[l];
-                        var n = 0;
+                        int n;
                         try
                         {
                             n = _serverStream.Read(data, 0, l);
@@ -207,13 +211,12 @@ namespace EasyConnectLib
             {
                 Disconnect();
             }
-            //}
         }
 
-        private void SendDataFromQueue()
+        private async void SendDataFromQueue()
         {
             if (_messageQueue.TryDequeue(out var message))
-                SendData(message);
+                await SendData(message);
         }
 
         public byte[] Read()
