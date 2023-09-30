@@ -200,10 +200,13 @@ namespace EasyConnectLib
                             return;
                         }
 
-                        if (DataReceivedEvent != null)
-                            OnDataReceivedEvent(data[0..n]);
-                        else
-                            receiveBuffer.AddRange(data[0..n]);
+                        if (n > 0)
+                        {
+                            if (DataReceivedEvent != null)
+                                OnDataReceivedEvent(data[0..n]);
+                            else
+                                receiveBuffer.AddRange(data[0..n]);
+                        }
                     }
                 }
             }

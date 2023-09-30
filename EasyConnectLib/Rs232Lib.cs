@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,8 +14,80 @@ namespace EasyConnectLib
         public string Port = "";
         public int Speed = 115200;
 
+        public int DataBits = 8;
+        public Parity Parity = Parity.None;
+        public StopBits StopBits = StopBits.One;
+        public Handshake Handshake = Handshake.None;
+
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
+
+        public bool DtrEnable
+        {
+            get => _serialPort?.DtrEnable ?? false;
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.DtrEnable = value;
+            }
+        }
+
+        public bool RtsEnable
+        {
+            get => _serialPort?.RtsEnable ?? false;
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.RtsEnable = value;
+            }
+        }
+
+        public bool BreakState
+        {
+            get => _serialPort?.BreakState ?? false;
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.BreakState = value;
+            }
+        }
+
+        public bool CDHolding => _serialPort?.CDHolding ?? false;
+
+        public bool CtsHolding => _serialPort?.CtsHolding ?? false;
+
+        public bool DsrHolding => _serialPort?.DsrHolding ?? false;
+
+        public Encoding Encoding
+        {
+            get => _serialPort?.Encoding ?? Encoding.ASCII;
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.Encoding = value;
+            }
+        }
+
+        public string NewLine
+        {
+            get => _serialPort?.NewLine ?? "";
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.NewLine = value;
+            }
+        }
+
+        public byte ParityReplace
+        {
+            get => _serialPort?.ParityReplace ?? 0;
+            set
+            {
+                if (_serialPort != null)
+                    _serialPort.ParityReplace = value;
+            }
+        }
+
 
         public bool IsConnected => _serialPort?.IsOpen ?? false;
 
@@ -62,10 +135,10 @@ namespace EasyConnectLib
                 {
                     PortName = Port,
                     BaudRate = Speed,
-                    DataBits = 8,
-                    Parity = Parity.None,
-                    StopBits = StopBits.One,
-                    Handshake = Handshake.None,
+                    DataBits = DataBits,
+                    Parity = Parity,
+                    StopBits = StopBits,
+                    Handshake = Handshake,
                     ReadTimeout = ReceiveTimeout,
                     WriteTimeout = SendTimeout
                 };
@@ -112,10 +185,8 @@ namespace EasyConnectLib
 
         public bool Disconnect()
         {
-            _cts.Cancel();
             try
             {
-                _serialPort?.Close();
                 _serialPort?.Dispose();
             }
             catch (Exception ex)
@@ -124,6 +195,8 @@ namespace EasyConnectLib
 
                 return false;
             }
+
+            _cts.Cancel();
 
             OnDisconnectedEvent();
 
@@ -196,10 +269,13 @@ namespace EasyConnectLib
                             return;
                         }
 
-                        if (DataReceivedEvent != null)
-                            OnDataReceivedEvent(data[0..n]);
-                        else
-                            receiveBuffer.AddRange(data[0..n]);
+                        if (n > 0)
+                        {
+                            if (DataReceivedEvent != null)
+                                OnDataReceivedEvent(data[0..n]);
+                            else
+                                receiveBuffer.AddRange(data[0..n]);
+                        }
                     }
                 }
             }
@@ -228,7 +304,6 @@ namespace EasyConnectLib
 
         private void OnDisconnectedEvent()
         {
-            Disconnect();
             Task.Run(() => DisconnectedEvent?.Invoke(this, EventArgs.Empty));
         }
 
