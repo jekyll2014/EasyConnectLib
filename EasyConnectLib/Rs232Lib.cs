@@ -11,7 +11,7 @@ namespace EasyConnectLib
 {
     public class Rs232Lib : IConnectionPort
     {
-        public string Port = "";
+        public string Port = string.Empty;
         public int Speed = 115200;
 
         public int DataBits = 8;
@@ -70,7 +70,7 @@ namespace EasyConnectLib
 
         public string NewLine
         {
-            get => _serialPort?.NewLine ?? "";
+            get => _serialPort?.NewLine ?? string.Empty;
             set
             {
                 if (_serialPort != null)
