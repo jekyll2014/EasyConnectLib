@@ -41,6 +41,8 @@ namespace EasyConnectLib
 
         private bool _disposedValue;
 
+        private Task? _sender;
+
         public TcpLib() { }
 
         public TcpLib(string host, int port)
@@ -86,7 +88,7 @@ namespace EasyConnectLib
             OnConnectedEvent();
 
             _cts = new CancellationTokenSource();
-            Task.Run(() =>
+            _sender = Task.Factory.StartNew(() =>
             {
                 while (!_cts.IsCancellationRequested)
                 {
@@ -103,21 +105,17 @@ namespace EasyConnectLib
                         Disconnect();
                     }
                 }
-            }, _cts.Token);
+            }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
             return true;
         }
 
-        /*public bool Reconnect()
-        {
-            Disconnect();
-            return Connect();
-        }*/
-
         public bool Disconnect()
         {
             _cts.Cancel();
+            _sender?.Wait();
             var result = true;
+
             try
             {
                 _serverStream?.Close();
@@ -137,7 +135,6 @@ namespace EasyConnectLib
         }
 
         #region Data acquisition
-
         public bool Send(byte[] data)
         {
             if (!IsConnected)
@@ -182,32 +179,40 @@ namespace EasyConnectLib
         {
             if (IsConnected)
             {
-                if (_serverStream?.DataAvailable ?? false)
+                try
                 {
-                    var l = _clientSocket?.Available ?? 0;
-                    if (l > 0)
+                    if (_serverStream?.DataAvailable ?? false)
                     {
-                        var data = new byte[l];
-                        int n;
-                        try
+                        var l = _clientSocket?.Available ?? 0;
+                        if (l > 0)
                         {
-                            n = _serverStream.Read(data, 0, l);
-                        }
-                        catch (Exception ex)
-                        {
-                            OnErrorEvent(ex.Message);
+                            var data = new byte[l];
+                            int n;
+                            try
+                            {
+                                n = _serverStream.Read(data, 0, l);
+                            }
+                            catch (Exception ex)
+                            {
+                                OnErrorEvent(ex.Message);
 
-                            return;
-                        }
+                                return;
+                            }
 
-                        if (n > 0)
-                        {
-                            if (DataReceivedEvent != null)
-                                OnDataReceivedEvent(data[0..n]);
-                            else
-                                receiveBuffer.AddRange(data[0..n]);
+                            if (n > 0)
+                            {
+                                if (DataReceivedEvent != null)
+                                    OnDataReceivedEvent(data[0..n]);
+                                else
+                                    receiveBuffer.AddRange(data[0..n]);
+                            }
                         }
                     }
+                }
+                catch (Exception ex)
+                {
+                    OnErrorEvent(ex.Message);
+                    Disconnect();
                 }
             }
             else
@@ -261,7 +266,6 @@ namespace EasyConnectLib
                 if (disposing)
                 {
                     Disconnect();
-                    _serverStream?.Dispose();
                     _clientSocket?.Close();
                     _clientSocket?.Dispose();
                     _messageQueue.Clear();

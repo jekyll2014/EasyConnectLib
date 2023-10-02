@@ -88,7 +88,6 @@ namespace EasyConnectLib
             }
         }
 
-
         public bool IsConnected => _serialPort?.IsOpen ?? false;
 
         public event IConnectionPort.ConnectedEventHandler? ConnectedEvent;
@@ -107,7 +106,10 @@ namespace EasyConnectLib
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
         private readonly List<byte> receiveBuffer = new List<byte>();
+
         private bool _disposedValue;
+
+        private Task? _sender;
 
         public Rs232Lib() { }
 
@@ -159,7 +161,7 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
-            Task.Run(() =>
+            _sender = Task.Factory.StartNew(() =>
             {
                 while (!_cts.IsCancellationRequested)
                 {
@@ -173,19 +175,16 @@ namespace EasyConnectLib
                         OnDisconnectedEvent();
                     }
                 }
-            });
+            }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
             return true;
         }
 
-        /*public bool Reconnect()
-        {
-            Disconnect();
-            return Connect();
-        }*/
-
         public bool Disconnect()
         {
+            _cts.Cancel();
+            _sender?.Wait();
+            var result = true;
             try
             {
                 _serialPort?.Dispose();
@@ -194,14 +193,12 @@ namespace EasyConnectLib
             {
                 OnErrorEvent(ex.Message);
 
-                return false;
+                result = false;
             }
-
-            _cts.Cancel();
 
             OnDisconnectedEvent();
 
-            return true;
+            return result;
         }
 
         public static string[] GetPortList()
@@ -320,9 +317,8 @@ namespace EasyConnectLib
 
         private void OnPinChangedEvent(SerialPinChange pin)
         {
-            PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin));
+            Task.Run(() => PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin)));
         }
-
         #endregion
 
         #region Dispose

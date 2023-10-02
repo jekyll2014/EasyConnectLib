@@ -23,8 +23,6 @@ namespace EasyConnectLib
 
         public bool Connect();
 
-        //public bool Reconnect();
-
         public bool Disconnect();
 
         public bool Send(byte[] data);
