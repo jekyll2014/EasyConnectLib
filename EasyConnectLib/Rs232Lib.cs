@@ -140,13 +140,14 @@ namespace EasyConnectLib
                     StopBits = StopBits,
                     Handshake = Handshake,
                     ReadTimeout = ReceiveTimeout,
-                    WriteTimeout = SendTimeout
+                    WriteTimeout = SendTimeout,
+                    RtsEnable = true
                 };
                 _serialPort.Open();
 
-                _serialPort.DataReceived += OnDataReceivedEventHandler;
-                _serialPort.ErrorReceived += OnErrorEventHandler;
-                _serialPort.PinChanged += OnPinChangedEventHandler;
+                _serialPort.DataReceived += SerialDataReceivedEventHandler;
+                _serialPort.ErrorReceived += SerialErrorReceivedEventHandler;
+                _serialPort.PinChanged += SerialPinChangedEventHandler;
             }
             catch (Exception ex)
             {
@@ -247,7 +248,7 @@ namespace EasyConnectLib
 
         #region EventHandlers
         private readonly object _lockReceive = new object();
-        private void OnDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
+        private void SerialDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
         {
             if (_serialPort?.IsOpen ?? false)
             {
@@ -285,12 +286,12 @@ namespace EasyConnectLib
             }
         }
 
-        private void OnErrorEventHandler(object sender, SerialErrorReceivedEventArgs e)
+        private void SerialErrorReceivedEventHandler(object sender, SerialErrorReceivedEventArgs e)
         {
             OnErrorEvent(e.EventType.ToString());
         }
 
-        private void OnPinChangedEventHandler(object sender, SerialPinChangedEventArgs e)
+        private void SerialPinChangedEventHandler(object sender, SerialPinChangedEventArgs e)
         {
             OnPinChangedEvent(e.EventType);
         }
