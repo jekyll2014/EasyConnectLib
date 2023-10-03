@@ -142,14 +142,13 @@ namespace EasyConnectLib
                     StopBits = StopBits,
                     Handshake = Handshake,
                     ReadTimeout = ReceiveTimeout,
-                    WriteTimeout = SendTimeout,
-                    RtsEnable = true
+                    WriteTimeout = SendTimeout
                 };
-                _serialPort.Open();
 
                 _serialPort.DataReceived += SerialDataReceivedEventHandler;
                 _serialPort.ErrorReceived += SerialErrorReceivedEventHandler;
                 _serialPort.PinChanged += SerialPinChangedEventHandler;
+                _serialPort.Open();
             }
             catch (Exception ex)
             {
@@ -182,8 +181,14 @@ namespace EasyConnectLib
 
         public bool Disconnect()
         {
+            if (_serialPort != null)
+            {
+                _serialPort.DataReceived -= SerialDataReceivedEventHandler;
+                _serialPort.ErrorReceived -= SerialErrorReceivedEventHandler;
+                _serialPort.PinChanged -= SerialPinChangedEventHandler;
+            }
             _cts.Cancel();
-            _sender?.Wait();
+            //_sender?.Wait();
             var result = true;
             try
             {

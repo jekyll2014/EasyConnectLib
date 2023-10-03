@@ -113,7 +113,7 @@ namespace EasyConnectLib
         public bool Disconnect()
         {
             _cts.Cancel();
-            _sender?.Wait();
+            //_sender?.Wait();
             var result = true;
 
             try
