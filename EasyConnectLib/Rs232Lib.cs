@@ -160,7 +160,7 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
-            _sender = Task.Factory.StartNew(() =>
+            _sender = Task.Factory.StartNew(async () =>
             {
                 while (!_cts.IsCancellationRequested)
                 {
@@ -173,6 +173,8 @@ namespace EasyConnectLib
                         Disconnect();
                         OnDisconnectedEvent();
                     }
+
+                    await Task.Yield();
                 }
             }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
@@ -302,27 +304,27 @@ namespace EasyConnectLib
         #region Events
         private void OnConnectedEvent()
         {
-            Task.Run(() => ConnectedEvent?.Invoke(this, EventArgs.Empty));
+            ConnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDisconnectedEvent()
         {
-            Task.Run(() => DisconnectedEvent?.Invoke(this, EventArgs.Empty));
+            DisconnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDataReceivedEvent(byte[] data)
         {
-            Task.Run(() => DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data)));
+            DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data));
         }
 
         private void OnErrorEvent(string message)
         {
-            Task.Run(() => ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message)));
+            ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
         }
 
         private void OnPinChangedEvent(SerialPinChange pin)
         {
-            Task.Run(() => PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin)));
+            PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin));
         }
         #endregion
 
