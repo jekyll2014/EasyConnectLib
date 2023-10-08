@@ -97,6 +97,7 @@ namespace EasyConnectLib
         public event IConnectionPort.DataReceivedEventHandler? DataReceivedEvent;
 
         public delegate void PinChangedEventHandler(object sender, PinChangedEventArgs e);
+
         public event PinChangedEventHandler? PinChangedEvent;
 
         public event IConnectionPort.ErrorEventHandler? ErrorEvent;
@@ -111,7 +112,9 @@ namespace EasyConnectLib
 
         private Task? _sender;
 
-        public Rs232Lib() { }
+        public Rs232Lib()
+        {
+        }
 
         public Rs232Lib(string port, int speed)
         {
@@ -189,6 +192,7 @@ namespace EasyConnectLib
                 _serialPort.ErrorReceived -= SerialErrorReceivedEventHandler;
                 _serialPort.PinChanged -= SerialPinChangedEventHandler;
             }
+
             _cts.Cancel();
             //_sender?.Wait();
             var result = true;
@@ -214,6 +218,7 @@ namespace EasyConnectLib
         }
 
         #region Data acquisition
+
         public bool Send(byte[] data)
         {
             if (!IsConnected)
@@ -248,14 +253,16 @@ namespace EasyConnectLib
 
             return result;
         }
+
         #endregion
 
         #region EventHandlers
+
         private readonly object _lockReceive = new object();
+
         private void SerialDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
         {
             if (_serialPort?.IsOpen ?? false)
-            {
                 lock (_lockReceive)
                 {
                     var l = _serialPort.BytesToRead;
@@ -283,11 +290,8 @@ namespace EasyConnectLib
                         }
                     }
                 }
-            }
             else
-            {
                 Disconnect();
-            }
         }
 
         private void SerialErrorReceivedEventHandler(object sender, SerialErrorReceivedEventArgs e)
@@ -299,9 +303,11 @@ namespace EasyConnectLib
         {
             OnPinChangedEvent(e.EventType);
         }
+
         #endregion
 
         #region Events
+
         private void OnConnectedEvent()
         {
             ConnectedEvent?.Invoke(this, EventArgs.Empty);
@@ -326,9 +332,11 @@ namespace EasyConnectLib
         {
             PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin));
         }
+
         #endregion
 
         #region Dispose
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
@@ -349,9 +357,10 @@ namespace EasyConnectLib
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
 
-            Dispose(disposing: true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
+
         #endregion
     }
 }

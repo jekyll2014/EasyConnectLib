@@ -20,15 +20,19 @@ namespace EasyConnectLib
         public bool IsConnected => _clientSocket?.Client?.Connected ?? false;
 
         public delegate void ConnectedEventHandler(object sender, EventArgs e);
+
         public event IConnectionPort.ConnectedEventHandler? ConnectedEvent;
 
         public delegate void DisconnectedEventHandler(object sender, EventArgs e);
+
         public event IConnectionPort.DisconnectedEventHandler? DisconnectedEvent;
 
         public delegate void DataReceivedEventHandler(object sender, BinaryDataReceivedEventArgs e);
+
         public event IConnectionPort.DataReceivedEventHandler? DataReceivedEvent;
 
         public delegate void ErrorEventHandler(object sender, ErrorReceivedEventArgs e);
+
         public event IConnectionPort.ErrorEventHandler? ErrorEvent;
 
         private TcpClient? _clientSocket;
@@ -43,7 +47,9 @@ namespace EasyConnectLib
 
         private Task? _sender;
 
-        public TcpLib() { }
+        public TcpLib()
+        {
+        }
 
         public TcpLib(string host, int port)
         {
@@ -137,6 +143,7 @@ namespace EasyConnectLib
         }
 
         #region Data acquisition
+
         public bool Send(byte[] data)
         {
             if (!IsConnected)
@@ -151,13 +158,9 @@ namespace EasyConnectLib
             try
             {
                 if (_serverStream != null && IsConnected)
-                {
                     await _serverStream.WriteAsync(data.ToArray(), 0, data.Count());
-                }
                 else
-                {
                     Disconnect();
-                }
             }
             catch (Exception ex)
             {
@@ -180,7 +183,6 @@ namespace EasyConnectLib
         private void ReadTelnet()
         {
             if (IsConnected)
-            {
                 try
                 {
                     if (_serverStream?.DataAvailable ?? false)
@@ -216,11 +218,8 @@ namespace EasyConnectLib
                     OnErrorEvent(ex.Message);
                     Disconnect();
                 }
-            }
             else
-            {
                 Disconnect();
-            }
         }
 
         private async void SendDataFromQueue()
@@ -236,9 +235,11 @@ namespace EasyConnectLib
 
             return result;
         }
+
         #endregion
 
         #region Events
+
         private void OnConnectedEvent()
         {
             ConnectedEvent?.Invoke(this, EventArgs.Empty);
@@ -258,9 +259,11 @@ namespace EasyConnectLib
         {
             ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
         }
+
         #endregion
 
         #region Dispose
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
@@ -282,9 +285,10 @@ namespace EasyConnectLib
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
 
-            Dispose(disposing: true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
+
         #endregion
     }
 }
