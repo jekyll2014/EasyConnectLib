@@ -111,7 +111,7 @@ namespace EasyConnectLib
                         Disconnect();
                     }
 
-                    await Task.Yield();
+                    await Task.Delay(1);
                 }
             }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
