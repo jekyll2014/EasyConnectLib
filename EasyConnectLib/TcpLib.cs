@@ -129,6 +129,7 @@ namespace EasyConnectLib
                 _serverStream?.Close();
                 _serverStream?.Dispose();
                 _clientSocket?.Close();
+                _clientSocket?.Dispose();
             }
             catch (Exception ex)
             {
@@ -271,6 +272,7 @@ namespace EasyConnectLib
                 if (disposing)
                 {
                     Disconnect();
+                    _serverStream?.Dispose();
                     _clientSocket?.Close();
                     _clientSocket?.Dispose();
                     _messageQueue.Clear();
