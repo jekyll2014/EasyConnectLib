@@ -110,8 +110,6 @@ namespace EasyConnectLib
 
         private bool _disposedValue;
 
-        private Task? _sender;
-
         public Rs232Lib()
         {
         }
@@ -163,7 +161,7 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
-            _sender = Task.Factory.StartNew(async () =>
+            Task.Factory.StartNew(async () =>
             {
                 while (!_cts.IsCancellationRequested)
                 {
@@ -194,7 +192,6 @@ namespace EasyConnectLib
             }
 
             _cts.Cancel();
-            //_sender?.Wait();
             var result = true;
             try
             {
@@ -331,6 +328,17 @@ namespace EasyConnectLib
         private void OnPinChangedEvent(SerialPinChange pin)
         {
             PinChangedEvent?.Invoke(this, new PinChangedEventArgs(pin));
+        }
+
+        #endregion
+
+        #region Logging
+
+        public event IConnectionPort.PcbLoggerEventHandler? PcbLoggerEvent;
+
+        public void OnPcbLoggerEvent(string message)
+        {
+            PcbLoggerEvent?.Invoke(this, message);
         }
 
         #endregion

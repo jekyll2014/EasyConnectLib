@@ -32,5 +32,16 @@ namespace EasyConnectLib
         public bool Send(byte[] data);
 
         public byte[] Read();
+
+        #region Logging
+
+        public delegate void PcbLoggerEventHandler(object sender, string message);
+
+        public event PcbLoggerEventHandler? PcbLoggerEvent;
+
+        public void OnPcbLoggerEvent(string message);
+
+        #endregion
+
     }
 }

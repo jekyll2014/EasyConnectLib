@@ -45,8 +45,6 @@ namespace EasyConnectLib
 
         private bool _disposedValue;
 
-        private Task? _sender;
-
         public TcpLib()
         {
         }
@@ -94,7 +92,7 @@ namespace EasyConnectLib
             OnConnectedEvent();
 
             _cts = new CancellationTokenSource();
-            _sender = Task.Factory.StartNew(async () =>
+            Task.Factory.StartNew(async () =>
             {
                 while (!_cts.IsCancellationRequested)
                 {
@@ -121,7 +119,6 @@ namespace EasyConnectLib
         public bool Disconnect()
         {
             _cts.Cancel();
-            //_sender?.Wait();
             var result = true;
 
             try
@@ -150,6 +147,7 @@ namespace EasyConnectLib
             if (!IsConnected)
                 return false;
 
+            OnPcbLoggerEvent($"Queueing to send: [{System.Text.Encoding.UTF8.GetString(data)}]");
             _messageQueue.Enqueue(data);
             return true;
         }
@@ -159,7 +157,10 @@ namespace EasyConnectLib
             try
             {
                 if (_serverStream != null && IsConnected)
+                {
+                    OnPcbLoggerEvent($"Sending: [{System.Text.Encoding.UTF8.GetString(data)}]");
                     await _serverStream.WriteAsync(data.ToArray(), 0, data.Count());
+                }
                 else
                     Disconnect();
             }
@@ -223,7 +224,7 @@ namespace EasyConnectLib
                 Disconnect();
         }
 
-        private async void SendDataFromQueue()
+        private async Task SendDataFromQueue()
         {
             if (_messageQueue.TryDequeue(out var message))
                 await SendData(message);
@@ -259,6 +260,17 @@ namespace EasyConnectLib
         private void OnErrorEvent(string message)
         {
             ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
+        }
+
+        #endregion
+
+        #region Logging
+
+        public event IConnectionPort.PcbLoggerEventHandler? PcbLoggerEvent;
+
+        public void OnPcbLoggerEvent(string message)
+        {
+            PcbLoggerEvent?.Invoke(this, message);
         }
 
         #endregion
