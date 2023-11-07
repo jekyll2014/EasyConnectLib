@@ -98,7 +98,7 @@ namespace EasyConnectLib
                 {
                     if (IsConnected)
                     {
-                        SendDataFromQueue();
+                        SendDataFromQueue().Wait();
                         ReadTelnet();
 
                         if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive().Result)
