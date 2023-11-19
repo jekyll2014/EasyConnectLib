@@ -8,7 +8,7 @@ namespace EasyConnectLib
 
         public PinChangedEventArgs(SerialPinChange pin)
         {
-            this.Pin = pin;
+            Pin = pin;
         }
     }
 }
