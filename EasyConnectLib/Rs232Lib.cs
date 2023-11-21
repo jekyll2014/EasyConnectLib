@@ -259,13 +259,14 @@ namespace EasyConnectLib
 
         private void SerialDataReceivedEventHandler(object sender, SerialDataReceivedEventArgs e)
         {
-            if (_serialPort?.IsOpen ?? false)
-                lock (_lockReceive)
+            lock (_lockReceive)
+            {
+                if (_serialPort?.IsOpen ?? false)
                 {
+                    var n = 0;
                     var l = _serialPort.BytesToRead;
-                    if (l > 0)
+                    while (l > 0)
                     {
-                        var n = 0;
                         var data = new byte[l];
                         try
                         {
@@ -278,17 +279,19 @@ namespace EasyConnectLib
                             return;
                         }
 
-                        if (n > 0)
-                        {
-                            if (DataReceivedEvent != null)
-                                OnDataReceivedEvent(data[0..n]);
-                            else
-                                receiveBuffer.AddRange(data[0..n]);
-                        }
+                        receiveBuffer.AddRange(data[0..n]);
+                        l = _serialPort.BytesToRead;
+                    }
+
+                    if (n > 0 && DataReceivedEvent != null)
+                    {
+                        OnDataReceivedEvent(receiveBuffer.ToArray());
+                        receiveBuffer.Clear();
                     }
                 }
-            else
-                Disconnect();
+                else
+                    Disconnect();
+            }
         }
 
         private void SerialErrorReceivedEventHandler(object sender, SerialErrorReceivedEventArgs e)
