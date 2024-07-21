@@ -109,7 +109,7 @@ namespace EasyConnectLib
                         Disconnect();
                     }
 
-                    await Task.Delay(1);
+                    await Task.Delay(10).ConfigureAwait(false);
                 }
             }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
@@ -159,7 +159,7 @@ namespace EasyConnectLib
                 if (_serverStream != null && IsConnected)
                 {
                     OnPcbLoggerEvent($"Sending: [{System.Text.Encoding.UTF8.GetString(data)}]");
-                    await _serverStream.WriteAsync(data.ToArray(), 0, data.Count());
+                    await _serverStream.WriteAsync(data.ToArray(), 0, data.Count()).ConfigureAwait(false);
                 }
                 else
                     Disconnect();
@@ -179,7 +179,7 @@ namespace EasyConnectLib
 
         private async Task<bool> SendKeepAlive()
         {
-            return await SendData(new byte[] { 0 });
+            return await SendData(new byte[] { 0 }).ConfigureAwait(false);
         }
 
         private void ReadTelnet()
@@ -227,7 +227,7 @@ namespace EasyConnectLib
         private async Task SendDataFromQueue()
         {
             if (_messageQueue.TryDequeue(out var message))
-                await SendData(message);
+                await SendData(message).ConfigureAwait(false);
         }
 
         public byte[] Read()

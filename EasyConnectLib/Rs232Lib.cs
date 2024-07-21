@@ -175,7 +175,7 @@ namespace EasyConnectLib
                         OnDisconnectedEvent();
                     }
 
-                    await Task.Delay(1);
+                    await Task.Delay(10).ConfigureAwait(false);
                 }
             }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
