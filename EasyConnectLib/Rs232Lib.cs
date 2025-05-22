@@ -103,10 +103,10 @@ namespace EasyConnectLib
         public event IConnectionPort.ErrorEventHandler? ErrorEvent;
 
         private SerialPort? _serialPort;
-        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
-        private readonly List<byte> receiveBuffer = new List<byte>();
+        private readonly List<byte> _receiveBuffer = new List<byte>();
 
         private bool _disposedValue;
 
@@ -125,7 +125,7 @@ namespace EasyConnectLib
             Port = port;
             Speed = speed;
             _messageQueue.Clear();
-            receiveBuffer.Clear();
+            _receiveBuffer.Clear();
 
             return Connect();
         }
@@ -161,6 +161,8 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
             Task.Factory.StartNew(async () =>
             {
                 while (!_cts.IsCancellationRequested)
@@ -184,6 +186,7 @@ namespace EasyConnectLib
 
         public bool Disconnect()
         {
+            _cts.Cancel();
             if (_serialPort != null)
             {
                 _serialPort.DataReceived -= SerialDataReceivedEventHandler;
@@ -191,7 +194,6 @@ namespace EasyConnectLib
                 _serialPort.PinChanged -= SerialPinChangedEventHandler;
             }
 
-            _cts.Cancel();
             var result = true;
             try
             {
@@ -200,7 +202,6 @@ namespace EasyConnectLib
             catch (Exception ex)
             {
                 OnErrorEvent(ex.Message);
-
                 result = false;
             }
 
@@ -245,8 +246,8 @@ namespace EasyConnectLib
 
         public byte[] Read()
         {
-            var result = receiveBuffer.ToArray();
-            receiveBuffer.Clear();
+            var result = _receiveBuffer.ToArray();
+            _receiveBuffer.Clear();
 
             return result;
         }
@@ -279,15 +280,28 @@ namespace EasyConnectLib
                             return;
                         }
 
-                        receiveBuffer.AddRange(data[0..n]);
+                        if (n > 0)
+                        {
+                            if (DataReceivedEvent != null)
+                            {
+                                if (_receiveBuffer.Count > 0)
+                                {
+                                    OnDataReceivedEvent(_receiveBuffer.ToArray());
+                                    _receiveBuffer.Clear();
+                                }
+
+                                OnDataReceivedEvent(data[0..n]);
+                            }
+                            else
+                                _receiveBuffer.AddRange(data[0..n]);
+                        }
+
+                        if (_cts.IsCancellationRequested)
+                            break;
+
                         l = _serialPort.BytesToRead;
                     }
 
-                    if (n > 0 && DataReceivedEvent != null)
-                    {
-                        OnDataReceivedEvent(receiveBuffer.ToArray());
-                        receiveBuffer.Clear();
-                    }
                 }
                 else
                     Disconnect();

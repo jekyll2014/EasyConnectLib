@@ -41,7 +41,7 @@ namespace EasyConnectLib
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
-        private readonly List<byte> receiveBuffer = new List<byte>();
+        private readonly List<byte> _receiveBuffer = new List<byte>();
 
         private bool _disposedValue;
 
@@ -91,6 +91,7 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
             Task.Factory.StartNew(async () =>
             {
@@ -124,14 +125,13 @@ namespace EasyConnectLib
             try
             {
                 _serverStream?.Close();
-                _serverStream?.Dispose();
                 _clientSocket?.Close();
+                _serverStream?.Dispose();
                 _clientSocket?.Dispose();
             }
             catch (Exception ex)
             {
                 OnErrorEvent(ex.Message);
-
                 result = false;
             }
 
@@ -149,6 +149,7 @@ namespace EasyConnectLib
 
             OnPcbLoggerEvent($"Queueing to send: [{System.Text.Encoding.UTF8.GetString(data)}]");
             _messageQueue.Enqueue(data);
+
             return true;
         }
 
@@ -208,9 +209,17 @@ namespace EasyConnectLib
                             if (n > 0)
                             {
                                 if (DataReceivedEvent != null)
+                                {
+                                    if (_receiveBuffer.Count > 0)
+                                    {
+                                        OnDataReceivedEvent(_receiveBuffer.ToArray());
+                                        _receiveBuffer.Clear();
+                                    }
+
                                     OnDataReceivedEvent(data[0..n]);
+                                }
                                 else
-                                    receiveBuffer.AddRange(data[0..n]);
+                                    _receiveBuffer.AddRange(data[0..n]);
                             }
                         }
                     }
@@ -232,8 +241,8 @@ namespace EasyConnectLib
 
         public byte[] Read()
         {
-            var result = receiveBuffer.ToArray();
-            receiveBuffer.Clear();
+            var result = _receiveBuffer.ToArray();
+            _receiveBuffer.Clear();
 
             return result;
         }
