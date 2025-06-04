@@ -149,6 +149,7 @@ namespace EasyConnectLib
                 _serialPort.DataReceived += SerialDataReceivedEventHandler;
                 _serialPort.ErrorReceived += SerialErrorReceivedEventHandler;
                 _serialPort.PinChanged += SerialPinChangedEventHandler;
+                OnPcbLoggerEvent($"Connecting to: {_serialPort.PortName}");
                 _serialPort.Open();
             }
             catch (Exception ex)
@@ -187,17 +188,19 @@ namespace EasyConnectLib
         public bool Disconnect()
         {
             _cts.Cancel();
-            if (_serialPort != null)
-            {
-                _serialPort.DataReceived -= SerialDataReceivedEventHandler;
-                _serialPort.ErrorReceived -= SerialErrorReceivedEventHandler;
-                _serialPort.PinChanged -= SerialPinChangedEventHandler;
-            }
 
             var result = true;
+            OnPcbLoggerEvent($"Disconnecting from: {_serialPort?.PortName}");
             try
             {
-                _serialPort?.Dispose();
+                if (_serialPort != null)
+                {
+                    _serialPort.Close();
+                    _serialPort.DataReceived -= SerialDataReceivedEventHandler;
+                    _serialPort.ErrorReceived -= SerialErrorReceivedEventHandler;
+                    _serialPort.PinChanged -= SerialPinChangedEventHandler;
+                    _serialPort.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -222,7 +225,9 @@ namespace EasyConnectLib
             if (!IsConnected)
                 return false;
 
+            OnPcbLoggerEvent($"Queueing to send: [{System.Text.Encoding.UTF8.GetString(data)}]");
             _messageQueue.Enqueue(data);
+
             return true;
         }
 
@@ -236,6 +241,7 @@ namespace EasyConnectLib
         {
             try
             {
+                OnPcbLoggerEvent($"Sending data: [{System.Text.Encoding.UTF8.GetString(data)}]");
                 _serialPort?.Write(data.ToArray(), 0, data.Count());
             }
             catch (Exception ex)
@@ -262,59 +268,64 @@ namespace EasyConnectLib
         {
             lock (_lockReceive)
             {
-                if (_serialPort?.IsOpen ?? false)
+                if (!(_serialPort?.IsOpen ?? false))
                 {
+                    Disconnect();
+
+                    return;
+                }
+
+                var l = _serialPort.BytesToRead;
+                while (l > 0)
+                {
+                    var data = new byte[l];
                     var n = 0;
-                    var l = _serialPort.BytesToRead;
-                    while (l > 0)
+                    try
                     {
-                        var data = new byte[l];
-                        try
-                        {
-                            n = _serialPort.Read(data, 0, l);
-                        }
-                        catch (Exception ex)
-                        {
-                            OnErrorEvent(ex.Message);
+                        n = _serialPort.Read(data, 0, l);
+                    }
+                    catch (Exception ex)
+                    {
+                        OnErrorEvent(ex.Message);
 
-                            return;
-                        }
-
-                        if (n > 0)
-                        {
-                            if (DataReceivedEvent != null)
-                            {
-                                if (_receiveBuffer.Count > 0)
-                                {
-                                    OnDataReceivedEvent(_receiveBuffer.ToArray());
-                                    _receiveBuffer.Clear();
-                                }
-
-                                OnDataReceivedEvent(data[0..n]);
-                            }
-                            else
-                                _receiveBuffer.AddRange(data[0..n]);
-                        }
-
-                        if (_cts.IsCancellationRequested)
-                            break;
-
-                        l = _serialPort.BytesToRead;
+                        return;
                     }
 
+                    if (n > 0)
+                    {
+                        OnPcbLoggerEvent($"Receiving data: [{System.Text.Encoding.UTF8.GetString(data[0..n])}]");
+                        if (DataReceivedEvent != null)
+                        {
+                            if (_receiveBuffer.Count > 0)
+                            {
+                                OnDataReceivedEvent(_receiveBuffer.ToArray());
+                                _receiveBuffer.Clear();
+                            }
+
+                            OnDataReceivedEvent(data[0..n]);
+                        }
+                        else
+                            _receiveBuffer.AddRange(data[0..n]);
+                    }
+
+                    if (_cts.IsCancellationRequested)
+                        break;
+
+                    l = _serialPort.BytesToRead;
                 }
-                else
-                    Disconnect();
             }
         }
 
         private void SerialErrorReceivedEventHandler(object sender, SerialErrorReceivedEventArgs e)
         {
-            OnErrorEvent(e.EventType.ToString());
+            var error = e.EventType.ToString();
+            OnPcbLoggerEvent($"Error: {error}");
+            OnErrorEvent(error);
         }
 
         private void SerialPinChangedEventHandler(object sender, SerialPinChangedEventArgs e)
         {
+            OnPcbLoggerEvent($"Pin changed: {e.EventType.ToString()}");
             OnPinChangedEvent(e.EventType);
         }
 
@@ -324,16 +335,19 @@ namespace EasyConnectLib
 
         private void OnConnectedEvent()
         {
+            OnPcbLoggerEvent($"Connected to: {_serialPort?.PortName}");
             ConnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDisconnectedEvent()
         {
+            OnPcbLoggerEvent($"Disconnected");
             DisconnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDataReceivedEvent(byte[] data)
         {
+            OnPcbLoggerEvent($"Data received");
             DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data));
         }
 

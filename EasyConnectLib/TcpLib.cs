@@ -10,8 +10,8 @@ namespace EasyConnectLib
 {
     public class TcpLib : IConnectionPort
     {
-        public string Host = "127.0.0.1";
-        public int Port = 23;
+        public string Host { get; private set; } = "127.0.0.1";
+        public int Port { get; private set; } = 23;
 
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
@@ -75,6 +75,7 @@ namespace EasyConnectLib
                     SendTimeout = SendTimeout
                 };
 
+                OnPcbLoggerEvent($"Connecting to: {_clientSocket.Client.RemoteEndPoint}");
                 _clientSocket.Connect(Host, Port);
                 _serverStream = _clientSocket.GetStream();
 
@@ -99,8 +100,8 @@ namespace EasyConnectLib
                 {
                     if (IsConnected)
                     {
-                        SendDataFromQueue().Wait();
-                        ReadTelnet();
+                        await SendDataFromQueue();
+                        await ReadTelnet();
 
                         if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive().Result)
                             Disconnect();
@@ -122,6 +123,7 @@ namespace EasyConnectLib
             _cts.Cancel();
             var result = true;
 
+            OnPcbLoggerEvent($"Disconnecting from: {_clientSocket?.Client?.RemoteEndPoint}");
             try
             {
                 _serverStream?.Close();
@@ -159,7 +161,7 @@ namespace EasyConnectLib
             {
                 if (_serverStream != null && IsConnected)
                 {
-                    OnPcbLoggerEvent($"Sending: [{System.Text.Encoding.UTF8.GetString(data)}]");
+                    OnPcbLoggerEvent($"Sending data: [{System.Text.Encoding.UTF8.GetString(data)}]");
                     await _serverStream.WriteAsync(data.ToArray(), 0, data.Count()).ConfigureAwait(false);
                 }
                 else
@@ -183,7 +185,7 @@ namespace EasyConnectLib
             return await SendData(new byte[] { 0 }).ConfigureAwait(false);
         }
 
-        private void ReadTelnet()
+        private async Task ReadTelnet()
         {
             if (IsConnected)
                 try
@@ -197,7 +199,7 @@ namespace EasyConnectLib
                             int n;
                             try
                             {
-                                n = _serverStream.Read(data, 0, l);
+                                n = await _serverStream.ReadAsync(data, 0, l);
                             }
                             catch (Exception ex)
                             {
@@ -208,6 +210,7 @@ namespace EasyConnectLib
 
                             if (n > 0)
                             {
+                                OnPcbLoggerEvent($"Receiving data: [{System.Text.Encoding.UTF8.GetString(data[0..n])}]");
                                 if (DataReceivedEvent != null)
                                 {
                                     if (_receiveBuffer.Count > 0)
@@ -253,21 +256,25 @@ namespace EasyConnectLib
 
         private void OnConnectedEvent()
         {
+            OnPcbLoggerEvent($"Connected to: {_clientSocket?.Client.RemoteEndPoint}");
             ConnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDisconnectedEvent()
         {
+            OnPcbLoggerEvent($"Disconnected");
             DisconnectedEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDataReceivedEvent(byte[] data)
         {
+            OnPcbLoggerEvent($"Data received");
             DataReceivedEvent?.Invoke(this, new BinaryDataReceivedEventArgs(data));
         }
 
         private void OnErrorEvent(string message)
         {
+            OnPcbLoggerEvent($"Error: {message}");
             ErrorEvent?.Invoke(this, new ErrorReceivedEventArgs(message));
         }
 
