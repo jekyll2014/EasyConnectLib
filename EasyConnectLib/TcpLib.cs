@@ -103,7 +103,7 @@ namespace EasyConnectLib
                         await SendDataFromQueue();
                         await ReadTelnet();
 
-                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !SendKeepAlive().Result)
+                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !(await SendKeepAlive()))
                             Disconnect();
                     }
                     else
