@@ -268,7 +268,7 @@ namespace EasyConnectLib
         {
             lock (_lockReceive)
             {
-                if (!(_serialPort?.IsOpen ?? false))
+                if (_serialPort != null && !_serialPort.IsOpen)
                 {
                     Disconnect();
 
