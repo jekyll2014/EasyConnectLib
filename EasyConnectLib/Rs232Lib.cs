@@ -275,14 +275,14 @@ namespace EasyConnectLib
                     return;
                 }
 
-                var l = _serialPort.BytesToRead;
+                var l = _serialPort?.BytesToRead ?? 0;
                 while (l > 0)
                 {
                     var data = new byte[l];
                     var n = 0;
                     try
                     {
-                        n = _serialPort.Read(data, 0, l);
+                        n = _serialPort?.Read(data, 0, l) ?? 0;
                     }
                     catch (Exception ex)
                     {
@@ -311,7 +311,7 @@ namespace EasyConnectLib
                     if (_cts.IsCancellationRequested)
                         break;
 
-                    l = _serialPort.BytesToRead;
+                    l = _serialPort?.BytesToRead ?? 0;
                 }
             }
         }
