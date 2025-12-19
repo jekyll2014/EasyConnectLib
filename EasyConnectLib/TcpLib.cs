@@ -16,6 +16,10 @@ namespace EasyConnectLib
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
         public int KeepAliveDelay = 1000;
+        
+        // Buffer size limits for embedded systems
+        public int MaxReceiveBufferSize { get; set; } = 1024 * 1024; // 1MB default
+        public int MaxBytesToReadAtOnce { get; set; } = 64 * 1024; // 64KB default
 
         public bool IsConnected => _clientSocket?.Client?.Connected ?? false;
 
@@ -39,9 +43,12 @@ namespace EasyConnectLib
         private NetworkStream? _serverStream;
         private DateTime _nextKeepAlive = DateTime.Now;
         private CancellationTokenSource _cts = new CancellationTokenSource();
+        private Task? _backgroundTask;
+        private readonly object _ctsLock = new object();
 
         private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
         private readonly List<byte> _receiveBuffer = new List<byte>();
+        private readonly object _receiveBufferLock = new object();
 
         private bool _disposedValue;
 
@@ -60,13 +67,27 @@ namespace EasyConnectLib
             Host = host;
             Port = port;
             _messageQueue.Clear();
+            lock (_receiveBufferLock)
+            {
+                _receiveBuffer.Clear();
+            }
 
             return Connect();
         }
 
         public bool Connect()
         {
-            _messageQueue.Clear();
+            // Prevent multiple concurrent connections
+            if (IsConnected)
+            {
+                OnPcbLoggerEvent("Already connected");
+                return true;
+            }
+
+            // Ensure clean state before connecting
+            Disconnect();
+
+            CancellationTokenSource? newCts = null;
             try
             {
                 _clientSocket = new TcpClient
@@ -75,15 +96,19 @@ namespace EasyConnectLib
                     SendTimeout = SendTimeout
                 };
 
-                OnPcbLoggerEvent($"Connecting to: {_clientSocket.Client.RemoteEndPoint}");
+                OnPcbLoggerEvent($"Connecting to: {Host}:{Port}");
                 _clientSocket.Connect(Host, Port);
                 _serverStream = _clientSocket.GetStream();
 
                 if (KeepAliveDelay > 0)
                     _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
+                    
+                // Create new CancellationTokenSource outside lock
+                newCts = new CancellationTokenSource();
             }
             catch (Exception ex)
             {
+                newCts?.Dispose();
                 Disconnect();
                 OnErrorEvent(ex.Message);
 
@@ -92,35 +117,77 @@ namespace EasyConnectLib
 
             OnConnectedEvent();
 
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
-            Task.Factory.StartNew(async () =>
+            lock (_ctsLock)
             {
-                while (!_cts.IsCancellationRequested)
+                // Atomic swap
+                var oldCts = _cts;
+                _cts = newCts;
+                oldCts?.Dispose();
+                
+                _backgroundTask = Task.Run(async () =>
                 {
-                    if (IsConnected)
+                    try
                     {
-                        await SendDataFromQueue();
-                        await ReadTelnet();
+                        while (!_cts.IsCancellationRequested)
+                        {
+                            if (IsConnected)
+                            {
+                                await SendDataFromQueue();
+                                await ReadTelnet();
 
-                        if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !(await SendKeepAlive()))
-                            Disconnect();
+                                if (KeepAliveDelay > 0 && DateTime.Now >= _nextKeepAlive && !(await SendKeepAlive()))
+                                    Disconnect();
+                            }
+                            else
+                            {
+                                Disconnect();
+                            }
+
+                            await Task.Delay(10, _cts.Token).ConfigureAwait(false);
+                        }
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        Disconnect();
+                        // Expected when cancellation is requested
                     }
-
-                    await Task.Delay(10).ConfigureAwait(false);
-                }
-            }, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                    catch (Exception ex)
+                    {
+                        OnErrorEvent($"Background task error: {ex.Message}");
+                    }
+                }, _cts.Token);
+            }
 
             return true;
         }
 
         public bool Disconnect()
         {
-            _cts.Cancel();
+            CancellationTokenSource? ctsToDispose = null;
+            
+            lock (_ctsLock)
+            {
+                if (_cts != null)
+                {
+                    _cts.Cancel();
+                    ctsToDispose = _cts;
+                    _cts = new CancellationTokenSource();
+                }
+            }
+
+            // Wait for background task to complete (with timeout)
+            try
+            {
+                _backgroundTask?.Wait(TimeSpan.FromSeconds(5));
+            }
+            catch (AggregateException)
+            {
+                // Task was cancelled, this is expected
+            }
+            finally
+            {
+                ctsToDispose?.Dispose();
+            }
+
             var result = true;
 
             OnPcbLoggerEvent($"Disconnecting from: {_clientSocket?.Client?.RemoteEndPoint}");
@@ -130,6 +197,8 @@ namespace EasyConnectLib
                 _clientSocket?.Close();
                 _serverStream?.Dispose();
                 _clientSocket?.Dispose();
+                _serverStream = null;
+                _clientSocket = null;
             }
             catch (Exception ex)
             {
@@ -162,7 +231,7 @@ namespace EasyConnectLib
                 if (_serverStream != null && IsConnected)
                 {
                     OnPcbLoggerEvent($"Sending data: [{System.Text.Encoding.UTF8.GetString(data)}]");
-                    await _serverStream.WriteAsync(data.ToArray(), 0, data.Count()).ConfigureAwait(false);
+                    await _serverStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
                 }
                 else
                     Disconnect();
@@ -193,6 +262,14 @@ namespace EasyConnectLib
                     if (_serverStream?.DataAvailable ?? false)
                     {
                         var l = _clientSocket?.Available ?? 0;
+                        
+                        // Protect against buffer overflow
+                        if (l > MaxBytesToReadAtOnce)
+                        {
+                            OnErrorEvent($"Available bytes ({l}) exceeds maximum ({MaxBytesToReadAtOnce}).");
+                            l = MaxBytesToReadAtOnce;
+                        }
+                        
                         if (l > 0)
                         {
                             var data = new byte[l];
@@ -213,16 +290,31 @@ namespace EasyConnectLib
                                 OnPcbLoggerEvent($"Receiving data: [{System.Text.Encoding.UTF8.GetString(data[0..n])}]");
                                 if (DataReceivedEvent != null)
                                 {
-                                    if (_receiveBuffer.Count > 0)
+                                    lock (_receiveBufferLock)
                                     {
-                                        OnDataReceivedEvent(_receiveBuffer.ToArray());
-                                        _receiveBuffer.Clear();
+                                        if (_receiveBuffer.Count > 0)
+                                        {
+                                            OnDataReceivedEvent(_receiveBuffer.ToArray());
+                                            _receiveBuffer.Clear();
+                                        }
                                     }
 
                                     OnDataReceivedEvent(data[0..n]);
                                 }
                                 else
-                                    _receiveBuffer.AddRange(data[0..n]);
+                                {
+                                    lock (_receiveBufferLock)
+                                    {
+                                        // Check buffer size limit before adding
+                                        if (_receiveBuffer.Count + n > MaxReceiveBufferSize)
+                                        {
+                                            OnErrorEvent($"Receive buffer overflow. Clearing buffer. Size: {_receiveBuffer.Count + n}");
+                                            _receiveBuffer.Clear();
+                                        }
+                                        
+                                        _receiveBuffer.AddRange(data[0..n]);
+                                    }
+                                }
                             }
                         }
                     }
@@ -244,10 +336,13 @@ namespace EasyConnectLib
 
         public byte[] Read()
         {
-            var result = _receiveBuffer.ToArray();
-            _receiveBuffer.Clear();
+            lock (_receiveBufferLock)
+            {
+                var result = _receiveBuffer.ToArray();
+                _receiveBuffer.Clear();
 
-            return result;
+                return result;
+            }
         }
 
         #endregion
@@ -300,13 +395,27 @@ namespace EasyConnectLib
                 if (disposing)
                 {
                     Disconnect();
+                    
+                    // Dispose the final CancellationTokenSource
+                    CancellationTokenSource? ctsToDispose = null;
+                    lock (_ctsLock)
+                    {
+                        ctsToDispose = _cts;
+                        _cts = null!;
+                    }
+                    ctsToDispose?.Dispose();
+                    
                     _serverStream?.Dispose();
                     _clientSocket?.Close();
                     _clientSocket?.Dispose();
                     _messageQueue.Clear();
+                    
+                    lock (_receiveBufferLock)
+                    {
+                        _receiveBuffer.Clear();
+                    }
                 }
 
-                // TODO: set large fields to null
                 _disposedValue = true;
             }
         }

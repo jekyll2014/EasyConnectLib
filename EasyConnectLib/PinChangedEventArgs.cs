@@ -1,10 +1,11 @@
-﻿using System.IO.Ports;
+﻿using System;
+using System.IO.Ports;
 
 namespace EasyConnectLib
 {
-    public class PinChangedEventArgs
+    public class PinChangedEventArgs : EventArgs
     {
-        public readonly SerialPinChange Pin;
+        public SerialPinChange Pin { get; }
 
         public PinChangedEventArgs(SerialPinChange pin)
         {

@@ -1,8 +1,10 @@
-﻿namespace EasyConnectLib
+﻿using System;
+
+namespace EasyConnectLib
 {
-    public class ErrorReceivedEventArgs
+    public class ErrorReceivedEventArgs : EventArgs
     {
-        public readonly string Message;
+        public string Message { get; }
 
         public ErrorReceivedEventArgs(string message)
         {

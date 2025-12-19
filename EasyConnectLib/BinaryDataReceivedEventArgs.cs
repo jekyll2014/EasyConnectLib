@@ -1,12 +1,15 @@
-﻿namespace EasyConnectLib
+﻿using System;
+
+namespace EasyConnectLib
 {
-    public class BinaryDataReceivedEventArgs
+    public class BinaryDataReceivedEventArgs : EventArgs
     {
-        public readonly byte[] Data;
+        public byte[] Data { get; }
 
         public BinaryDataReceivedEventArgs(byte[] data)
         {
-            Data = data;
+            // Defensive copy to prevent external modification
+            Data = (byte[])data.Clone();
         }
     }
 }
