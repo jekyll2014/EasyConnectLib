@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Ports;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +20,7 @@ namespace EasyConnectLib
 
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
-        
+
         // Buffer size limits for embedded systems
         public int MaxReceiveBufferSize { get; set; } = 1024 * 1024; // 1MB default
         public int MaxBytesToReadAtOnce { get; set; } = 64 * 1024; // 64KB default
@@ -193,7 +192,7 @@ namespace EasyConnectLib
                 var oldCts = _cts;
                 _cts = newCts;
                 oldCts?.Dispose();
-                
+
                 _backgroundTask = Task.Run(async () =>
                 {
                     try
@@ -230,7 +229,7 @@ namespace EasyConnectLib
         public bool Disconnect()
         {
             CancellationTokenSource? ctsToDispose = null;
-            
+
             lock (_ctsLock)
             {
                 if (_cts != null)
@@ -347,14 +346,14 @@ namespace EasyConnectLib
                 }
 
                 var l = _serialPort?.BytesToRead ?? 0;
-                
+
                 // Protect against buffer overflow from malformed hardware/driver
                 if (l > MaxBytesToReadAtOnce)
                 {
                     OnErrorEvent($"BytesToRead ({l}) exceeds maximum ({MaxBytesToReadAtOnce}). Possible hardware/driver issue.");
                     l = MaxBytesToReadAtOnce;
                 }
-                
+
                 while (l > 0)
                 {
                     var data = new byte[l];
@@ -396,7 +395,7 @@ namespace EasyConnectLib
                                     OnErrorEvent($"Receive buffer overflow. Clearing buffer. Size: {_receiveBuffer.Count + n}");
                                     _receiveBuffer.Clear();
                                 }
-                                
+
                                 _receiveBuffer.AddRange(data[0..n]);
                             }
                         }
@@ -406,7 +405,7 @@ namespace EasyConnectLib
                         break;
 
                     l = _serialPort?.BytesToRead ?? 0;
-                    
+
                     // Recheck limit in loop
                     if (l > MaxBytesToReadAtOnce)
                     {
@@ -484,7 +483,7 @@ namespace EasyConnectLib
                 if (disposing)
                 {
                     Disconnect();
-                    
+
                     // Dispose the final CancellationTokenSource
                     CancellationTokenSource? ctsToDispose = null;
                     lock (_ctsLock)
@@ -493,10 +492,10 @@ namespace EasyConnectLib
                         _cts = null!; // Prevent further use
                     }
                     ctsToDispose?.Dispose();
-                    
+
                     _serialPort?.Dispose();
                     _messageQueue.Clear();
-                    
+
                     lock (_receiveBufferLock)
                     {
                         _receiveBuffer.Clear();

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +15,7 @@ namespace EasyConnectLib
         public int ReceiveTimeout { get; set; } = 1000;
         public int SendTimeout { get; set; } = 1000;
         public int KeepAliveDelay = 1000;
-        
+
         // Buffer size limits for embedded systems
         public int MaxReceiveBufferSize { get; set; } = 1024 * 1024; // 1MB default
         public int MaxBytesToReadAtOnce { get; set; } = 64 * 1024; // 64KB default
@@ -102,7 +101,7 @@ namespace EasyConnectLib
 
                 if (KeepAliveDelay > 0)
                     _nextKeepAlive = DateTime.Now.AddMilliseconds(KeepAliveDelay);
-                    
+
                 // Create new CancellationTokenSource outside lock
                 newCts = new CancellationTokenSource();
             }
@@ -123,7 +122,7 @@ namespace EasyConnectLib
                 var oldCts = _cts;
                 _cts = newCts;
                 oldCts?.Dispose();
-                
+
                 _backgroundTask = Task.Run(async () =>
                 {
                     try
@@ -163,7 +162,7 @@ namespace EasyConnectLib
         public bool Disconnect()
         {
             CancellationTokenSource? ctsToDispose = null;
-            
+
             lock (_ctsLock)
             {
                 if (_cts != null)
@@ -262,14 +261,14 @@ namespace EasyConnectLib
                     if (_serverStream?.DataAvailable ?? false)
                     {
                         var l = _clientSocket?.Available ?? 0;
-                        
+
                         // Protect against buffer overflow
                         if (l > MaxBytesToReadAtOnce)
                         {
                             OnErrorEvent($"Available bytes ({l}) exceeds maximum ({MaxBytesToReadAtOnce}).");
                             l = MaxBytesToReadAtOnce;
                         }
-                        
+
                         if (l > 0)
                         {
                             var data = new byte[l];
@@ -311,7 +310,7 @@ namespace EasyConnectLib
                                             OnErrorEvent($"Receive buffer overflow. Clearing buffer. Size: {_receiveBuffer.Count + n}");
                                             _receiveBuffer.Clear();
                                         }
-                                        
+
                                         _receiveBuffer.AddRange(data[0..n]);
                                     }
                                 }
@@ -395,7 +394,7 @@ namespace EasyConnectLib
                 if (disposing)
                 {
                     Disconnect();
-                    
+
                     // Dispose the final CancellationTokenSource
                     CancellationTokenSource? ctsToDispose = null;
                     lock (_ctsLock)
@@ -404,12 +403,12 @@ namespace EasyConnectLib
                         _cts = null!;
                     }
                     ctsToDispose?.Dispose();
-                    
+
                     _serverStream?.Dispose();
                     _clientSocket?.Close();
                     _clientSocket?.Dispose();
                     _messageQueue.Clear();
-                    
+
                     lock (_receiveBufferLock)
                     {
                         _receiveBuffer.Clear();
